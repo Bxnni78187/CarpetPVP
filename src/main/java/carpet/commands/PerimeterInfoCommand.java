@@ -6,6 +6,7 @@ import carpet.utils.Messenger;
 import carpet.utils.PerimeterDiagnostics;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
@@ -39,7 +40,7 @@ public class PerimeterInfoCommand
                                 BlockPosArgument.getSpawnablePos(c, "center position"),
                                 null)).
                         then(argument("mob", resource(commandBuildContext, Registries.ENTITY_TYPE)).
-                                suggests(SuggestionProviders.SUMMONABLE_ENTITIES).
+                                suggests((SuggestionProvider<CommandSourceStack>) (SuggestionProvider<?>) SuggestionProviders.SUMMONABLE_ENTITIES).
                                 executes( (c) -> perimeterDiagnose(
                                         c.getSource(),
                                         BlockPosArgument.getSpawnablePos(c, "center position"),

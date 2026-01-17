@@ -1,13 +1,19 @@
 package carpet.script.value;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.RegistryOps;
 
 public class FormattedTextValue extends StringValue
 {
+    private static final Gson GSON = new Gson();
     Component text;
 
     public FormattedTextValue(Component text)
@@ -86,7 +92,7 @@ public class FormattedTextValue extends StringValue
         {
             throw new NBTSerializableValue.IncompatibleTypeException(this);
         }
-        return StringTag.valueOf(Component.Serializer.toJson(text, regs));
+        return StringTag.valueOf(serialize(regs));
     }
 
     @Override
@@ -97,12 +103,16 @@ public class FormattedTextValue extends StringValue
 
     public String serialize(RegistryAccess regs)
     {
-        return Component.Serializer.toJson(text, regs);
+        RegistryOps<JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, regs);
+        JsonElement jsonElement = ComponentSerialization.CODEC.encodeStart(ops, text).getOrThrow();
+        return GSON.toJson(jsonElement);
     }
 
     public static FormattedTextValue deserialize(String serialized, RegistryAccess regs)
     {
-        return new FormattedTextValue(Component.Serializer.fromJson(serialized, regs));
+        RegistryOps<JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, regs);
+        JsonElement element = GSON.fromJson(serialized, JsonElement.class);
+        return new FormattedTextValue(ComponentSerialization.CODEC.parse(ops, element).getOrThrow());
     }
 
     public static Component getTextByValue(Value value)

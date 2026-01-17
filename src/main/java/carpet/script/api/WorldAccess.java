@@ -86,6 +86,9 @@ import java.util.stream.Stream;
 import net.minecraft.commands.arguments.item.ItemInput;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.network.protocol.game.ClientboundExplodePacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
@@ -829,7 +832,8 @@ public class WorldAccess
                         destTag.putInt("x", targetPos.getX());
                         destTag.putInt("y", targetPos.getY());
                         destTag.putInt("z", targetPos.getZ());
-                        be.loadWithComponents(destTag, world.registryAccess());
+                        ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, world.registryAccess(), destTag);
+                        be.loadWithComponents(input);
                         be.setChanged();
                         success = true;
                     }

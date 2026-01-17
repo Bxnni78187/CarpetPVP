@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "id": "carpet-pvp",
   "version": "1.2",
+  "provides": ["carpet"],
 
   "name": "Carpet PVP",
   "description": "Carpet with some PVP tweaks",
@@ -27,14 +28,14 @@
       "carpet.utils.CarpetRulePrinter"
     ]
   },
-  "mixins": [
+"mixins": [
     "carpet.mixins.json"
   ],
   "accessWidener" : "carpet.accesswidener",
 
   "depends": {
-    "minecraft": ">=1.21.5",
-    "fabricloader": ">=0.16.10",
+    "minecraft": ">=1.21.6",
+    "fabricloader": ">=0.18.4",
     "java": ">=21"
   }
 }

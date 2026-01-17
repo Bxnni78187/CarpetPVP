@@ -101,7 +101,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.commands.BossBarCommands;
-import net.minecraft.server.commands.LootCommand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.Vec2;
@@ -162,7 +161,7 @@ public abstract class CommandArgument
                     (c, p) -> StringValue.of(EntityAnchorArgument.getAnchor(c, p).name()), false
             ),
             new VanillaUnconfigurableArgument("entitytype", c -> ResourceArgument.resource(c, Registries.ENTITY_TYPE),
-                    (c, p) -> ValueConversions.of(ResourceArgument.getSummonableEntityType(c, p).key()), SuggestionProviders.SUMMONABLE_ENTITIES
+                    (c, p) -> ValueConversions.of(ResourceArgument.getSummonableEntityType(c, p).key()), (SuggestionProvider<CommandSourceStack>) (SuggestionProvider<?>) SuggestionProviders.SUMMONABLE_ENTITIES
             ),
             new VanillaUnconfigurableArgument("floatrange", RangeArgument::floatRange,
                     (c, p) -> ValueConversions.of(c.getArgument(p, MinMaxBounds.Doubles.class)), true
@@ -206,10 +205,10 @@ public abstract class CommandArgument
             new VanillaUnconfigurableArgument("recipe", Registries.RECIPE),
             new VanillaUnconfigurableArgument("advancement", Registries.ADVANCEMENT),
             new VanillaUnconfigurableArgument("lootcondition", ResourceLocationArgument::id,
-                    (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), (ctx, builder) -> SharedSuggestionProvider.suggestResource(ctx.getSource().getServer().reloadableRegistries().getKeys(Registries.LOOT_CONDITION_TYPE), builder)
+                    (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), (ctx, builder) -> SharedSuggestionProvider.suggestResource(ctx.getSource().getServer().reloadableRegistries().lookup().lookupOrThrow(Registries.PREDICATE).listElementIds().map(k -> k.location()), builder)
             ),
             new VanillaUnconfigurableArgument("loottable", ResourceLocationArgument::id,
-                    (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), LootCommand.SUGGEST_LOOT_TABLE
+                    (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), (ctx, builder) -> SharedSuggestionProvider.suggestResource(ctx.getSource().getServer().reloadableRegistries().lookup().lookupOrThrow(Registries.LOOT_TABLE).listElementIds().map(k -> k.location()), builder)
             ),
             new VanillaUnconfigurableArgument("attribute", Registries.ATTRIBUTE),
 
@@ -233,7 +232,7 @@ public abstract class CommandArgument
                     }, (ctx, builder) -> SharedSuggestionProvider.suggestResource(ctx.getSource().getServer().registryAccess().lookupOrThrow(Registries.BIOME).keySet(), builder)
             ),
             new VanillaUnconfigurableArgument("sound", ResourceLocationArgument::id,
-                    (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), SuggestionProviders.AVAILABLE_SOUNDS
+                    (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), (SuggestionProvider<CommandSourceStack>) (SuggestionProvider<?>) SuggestionProviders.AVAILABLE_SOUNDS
             ),
             new VanillaUnconfigurableArgument("storekey", ResourceLocationArgument::id,
                     (c, p) -> ValueConversions.of(ResourceLocationArgument.getId(c, p)), (ctx, builder) -> SharedSuggestionProvider.suggestResource(ctx.getSource().getServer().getCommandStorage().keys(), builder)

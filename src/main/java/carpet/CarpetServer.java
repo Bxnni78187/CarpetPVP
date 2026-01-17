@@ -14,6 +14,7 @@ import carpet.commands.LogCommand;
 import carpet.commands.MobAICommand;
 import carpet.commands.PerimeterInfoCommand;
 import carpet.commands.PlayerCommand;
+import carpet.commands.PlayerSpawnCommand;
 import carpet.commands.ProfileCommand;
 import carpet.script.ScriptCommand;
 import carpet.commands.SpawnCommand;
@@ -48,6 +49,7 @@ public class CarpetServer // static for now - easier to handle all around the co
     public static CarpetScriptServer scriptServer;
     public static carpet.settings.SettingsManager settingsManager; // to change type to api type, can't change right now because of binary and source compat
     public static final List<CarpetExtension> extensions = new ArrayList<>();
+    private static boolean gameStarted = false;
 
     /**
      * Registers a {@link CarpetExtension} to be managed by Carpet.<br>
@@ -73,6 +75,11 @@ public class CarpetServer // static for now - easier to handle all around the co
     // to register before this call in a ModInitializer (declared in fabric.mod.json)
     public static void onGameStarted()
     {
+        if (gameStarted)
+        {
+            return;
+        }
+        gameStarted = true;
         settingsManager = new carpet.settings.SettingsManager(CarpetSettings.carpetVersion, "carpet", "Carpet Mod");
         settingsManager.parseSettingsClass(CarpetSettings.class);
         extensions.forEach(CarpetExtension::onGameStarted);

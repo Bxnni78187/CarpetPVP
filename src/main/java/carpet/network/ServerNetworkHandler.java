@@ -15,12 +15,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -61,7 +66,7 @@ public class ServerNetworkHandler
         {
             CarpetSettings.LOG.warn("Player " + playerEntity.getName().getString() + " joined with another carpet version: " + version);
         }
-        DataBuilder data = DataBuilder.create(playerEntity.server); // tickrate related settings are sent on world change
+        DataBuilder data = DataBuilder.create(playerEntity.getServer()); // tickrate related settings are sent on world change
         CarpetServer.forEachManager(sm -> sm.getCarpetRules().forEach(data::withRule));
         playerEntity.connection.send(data.build());
     }
@@ -102,15 +107,18 @@ public class ServerNetworkHandler
         }
         result.putInt("return", returnValue[0]);
         ListTag outputResult = new ListTag();
+        Gson gson = new Gson();
+        RegistryOps<JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, player.registryAccess());
         for (Component line : output)
         {
-            outputResult.add(StringTag.valueOf(Component.Serializer.toJson(line, player.registryAccess())));
+            JsonElement jsonElement = ComponentSerialization.CODEC.encodeStart(ops, line).getOrThrow();
+            outputResult.add(StringTag.valueOf(gson.toJson(jsonElement)));
         }
         if (!output.isEmpty())
         {
             result.put("output", outputResult);
         }
-        player.connection.send(DataBuilder.create(player.server).withCustomNbt("clientCommand", result).build());
+        player.connection.send(DataBuilder.create(player.getServer()).withCustomNbt("clientCommand", result).build());
         // run command plug to command output,
     }
 
@@ -137,7 +145,7 @@ public class ServerNetworkHandler
         }
         for (ServerPlayer player : remoteCarpetPlayers.keySet())
         {
-            player.connection.send(DataBuilder.create(player.server).withRule(rule).build());
+            player.connection.send(DataBuilder.create(player.getServer()).withRule(rule).build());
         }
     }
 
@@ -149,7 +157,7 @@ public class ServerNetworkHandler
         }
         for (ServerPlayer player : validCarpetPlayers)
         {
-            player.connection.send(DataBuilder.create(player.server).withCustomNbt(command, data).build());
+            player.connection.send(DataBuilder.create(player.getServer()).withCustomNbt(command, data).build());
         }
     }
 
@@ -157,7 +165,7 @@ public class ServerNetworkHandler
     {
         if (isValidCarpetPlayer(player))
         {
-            player.connection.send(DataBuilder.create(player.server).withCustomNbt(command, data).build());
+            player.connection.send(DataBuilder.create(player.getServer()).withCustomNbt(command, data).build());
         }
     }
 

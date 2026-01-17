@@ -230,7 +230,7 @@ public class PlayerCommand
     private static int kill(CommandContext<CommandSourceStack> context) throws CommandSyntaxException
     {
         for (EntityPlayerMPFake fake : requireFakeTargets(context))
-            fake.kill(fake.serverLevel());
+            fake.kill(fake.level());
         return 1;
     }
 

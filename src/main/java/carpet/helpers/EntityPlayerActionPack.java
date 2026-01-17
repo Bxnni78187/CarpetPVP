@@ -176,6 +176,20 @@ public class EntityPlayerActionPack
         return stopMovement();
     }
 
+    public EntityPlayerActionPack stopUse()
+    {
+        Action action = actions.remove(ActionType.USE);
+        if (action != null) ActionType.USE.stop(player, action);
+        return this;
+    }
+
+    public EntityPlayerActionPack stopSwing()
+    {
+        Action action = actions.remove(ActionType.SWING);
+        if (action != null) ActionType.SWING.stop(player, action);
+        return this;
+    }
+
     public EntityPlayerActionPack mount(boolean onlyRideables)
     {
         //test what happens
@@ -344,7 +358,7 @@ public class EntityPlayerActionPack
                         case BLOCK:
                         {
                             player.resetLastActionTime();
-                            ServerLevel world = player.serverLevel();
+                            ServerLevel world = player.level();
                             BlockHitResult blockHit = (BlockHitResult) hit;
                             BlockPos pos = blockHit.getBlockPos();
                             Direction side = blockHit.getDirection();
@@ -554,6 +568,16 @@ public class EntityPlayerActionPack
                 ItemStack itemStack_1 = player.getItemInHand(InteractionHand.OFF_HAND);
                 player.setItemInHand(InteractionHand.OFF_HAND, player.getItemInHand(InteractionHand.MAIN_HAND));
                 player.setItemInHand(InteractionHand.MAIN_HAND, itemStack_1);
+                return false;
+            }
+        },
+        SWING(true)
+        {
+            @Override
+            boolean execute(ServerPlayer player, Action action)
+            {
+                player.resetLastActionTime();
+                player.swing(InteractionHand.MAIN_HAND);
                 return false;
             }
         };

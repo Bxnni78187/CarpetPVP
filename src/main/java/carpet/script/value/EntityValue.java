@@ -26,6 +26,10 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundSetExperiencePacket;
@@ -526,7 +530,7 @@ public class EntityValue extends Value
             }
             return Value.NULL;
         });
-        put("home", (e, a) -> e instanceof Mob mob ? (mob.getRestrictRadius() > 0) ? new BlockValue(null, (ServerLevel) e.level(), mob.getRestrictCenter()) : Value.FALSE : Value.NULL);
+        put("home", (e, a) -> e instanceof Mob mob ? (mob.getHomeRadius() > 0) ? new BlockValue(null, (ServerLevel) e.level(), mob.getHomePosition()) : Value.FALSE : Value.NULL);
         put("spawn_point", (e, a) -> {
             if (e instanceof ServerPlayer spe)
             {
@@ -570,7 +574,7 @@ public class EntityValue extends Value
                 {
                     return Value.NULL;
                 }
-                return ValueConversions.fromPath((ServerLevel) e.getCommandSenderWorld(), path);
+                return ValueConversions.fromPath((ServerLevel) e.level(), path);
             }
             return Value.NULL;
         });
@@ -621,7 +625,7 @@ public class EntityValue extends Value
                 {
                     return StringValue.of(moddedType);
                 }
-                MinecraftServer server = p.getCommandSenderWorld().getServer();
+                MinecraftServer server = p.level().getServer();
                 if (server.isDedicatedServer())
                 {
                     return new StringValue("multiplayer");
@@ -711,7 +715,7 @@ public class EntityValue extends Value
                 {
                     return Value.NULL;
                 }
-                return new BlockValue(null, sp.serverLevel(), pos);
+                return new BlockValue(null, sp.level(), pos);
             }
             return Value.NULL;
         });
@@ -826,7 +830,7 @@ public class EntityValue extends Value
                 case MISS:
                     return Value.NULL;
                 case BLOCK:
-                    return new BlockValue((ServerLevel) e.getCommandSenderWorld(), ((BlockHitResult) hitres).getBlockPos());
+                    return new BlockValue((ServerLevel) e.level(), ((BlockHitResult) hitres).getBlockPos());
                 case ENTITY:
                     return new EntityValue(((EntityHitResult) hitres).getEntity());
             }
@@ -856,7 +860,9 @@ public class EntityValue extends Value
         });
 
         put("nbt", (e, a) -> {
-            CompoundTag nbttagcompound = e.saveWithoutId((new CompoundTag()));
+            TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, e.registryAccess());
+            e.saveWithoutId(output);
+            CompoundTag nbttagcompound = output.buildResult();
             if (a == null)
             {
                 return new NBTSerializableValue(nbttagcompound);
@@ -920,7 +926,7 @@ public class EntityValue extends Value
             }
             else
             {
-                ((ServerLevel) e.getCommandSenderWorld()).getChunkSource().broadcastAndSend(e, ClientboundEntityPositionSyncPacket.of(e));
+                ((ServerLevel) e.level()).getChunkSource().broadcastAndSend(e, ClientboundEntityPositionSyncPacket.of(e));
             }
         }
     }
@@ -1312,7 +1318,7 @@ public class EntityValue extends Value
             }
             if (v.isNull())
             {
-                ec.restrictTo(BlockPos.ZERO, -1);
+                ec.setHomeTo(BlockPos.ZERO, -1);
                 Map<String, Goal> tasks = Vanilla.Mob_getTemporaryTasks(ec);
                 Vanilla.Mob_getAI(ec, false).removeGoal(tasks.get("home"));
                 tasks.remove("home");
@@ -1345,7 +1351,7 @@ public class EntityValue extends Value
                 throw new InternalExpressionException("'home' requires at least one position argument, and optional distance");
             }
 
-            ec.restrictTo(pos, distance);
+            ec.setHomeTo(pos, distance);
             Map<String, Goal> tasks = Vanilla.Mob_getTemporaryTasks(ec);
             if (!tasks.containsKey("home"))
             {
@@ -1369,7 +1375,7 @@ public class EntityValue extends Value
                 List<Value> params = lv.getItems();
                 Vector3Argument blockLocator = Vector3Argument.findIn(params, 0, false, false);
                 BlockPos pos = BlockPos.containing(blockLocator.vec);
-                ResourceKey<Level> world = spe.getCommandSenderWorld().dimension();
+                ResourceKey<Level> world = spe.level().dimension();
                 float angle = spe.getYHeadRot();
                 boolean forced = false;
                 if (params.size() > blockLocator.offset)
@@ -1675,7 +1681,8 @@ public class EntityValue extends Value
                 Value tagValue = NBTSerializableValue.fromValue(v);
                 if (tagValue instanceof NBTSerializableValue nbtsv)
                 {
-                    e.load(nbtsv.getCompoundTag());
+                    ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, e.registryAccess(), nbtsv.getCompoundTag());
+                    e.load(input);
                     e.setUUID(uUID);
                 }
             }
@@ -1687,9 +1694,12 @@ public class EntityValue extends Value
                 Value tagValue = NBTSerializableValue.fromValue(v);
                 if (tagValue instanceof NBTSerializableValue nbtsv)
                 {
-                    CompoundTag nbttagcompound = e.saveWithoutId((new CompoundTag()));
+                    TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, e.registryAccess());
+                    e.saveWithoutId(output);
+                    CompoundTag nbttagcompound = output.buildResult();
                     nbttagcompound.merge(nbtsv.getCompoundTag());
-                    e.load(nbttagcompound);
+                    ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, e.registryAccess(), nbttagcompound);
+                    e.load(input);
                     e.setUUID(uUID);
                 }
             }
@@ -1743,7 +1753,9 @@ public class EntityValue extends Value
             throw new NBTSerializableValue.IncompatibleTypeException(this);
         }
         CompoundTag tag = new CompoundTag();
-        tag.put("Data", getEntity().saveWithoutId(new CompoundTag()));
+        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, regs);
+        getEntity().saveWithoutId(output);
+        tag.put("Data", output.buildResult());
         Registry<EntityType<?>> reg = getEntity().level().registryAccess().lookupOrThrow(Registries.ENTITY_TYPE);
         tag.put("Name", StringTag.valueOf(reg.getKey(getEntity().getType()).toString()));
         return tag;

@@ -3,14 +3,19 @@ package carpet.network;
 import carpet.CarpetServer;
 import carpet.CarpetSettings;
 import carpet.script.utils.ShapesRenderer;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
 
 public class CarpetClient
@@ -104,9 +109,13 @@ public class CarpetClient
         if (tag.contains("output"))
         {
             ListTag outputTag = (ListTag) tag.get("output");
+            Gson gson = new Gson();
+            RegistryOps<JsonElement> ops = RegistryOps.create(JsonOps.INSTANCE, clientPlayer.registryAccess());
             for (int i = 0; i < outputTag.size(); i++)
             {
-                CarpetSettings.LOG.info(" - response: " + Component.Serializer.fromJson(outputTag.getString(i).orElseThrow(), clientPlayer.registryAccess()).getString());
+                JsonElement element = gson.fromJson(outputTag.getString(i).orElseThrow(), JsonElement.class);
+                Component component = ComponentSerialization.CODEC.parse(ops, element).getOrThrow();
+                CarpetSettings.LOG.info(" - response: " + component.getString());
             }
         }
     }
