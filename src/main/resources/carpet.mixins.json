@@ -182,6 +182,11 @@
 
     "DefaultRedstoneWireEvaluator_redstoneMixin",
 
+    "BaseCommandBlockMixin",
+    "CooldownInstanceInterface",
+    "ItemCooldownsInterface",
+    "ServerExplosionMixin",
+
     "CustomPacketPayload_networkStuffMixin",
     "ServerGamePacketListenerimpl_connectionMixin"
 

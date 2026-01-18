@@ -41,6 +41,20 @@ public class DistanceCalculator
         return 1;
     }
 
+    public static int distance(CommandSourceStack source, Vec3 from, Vec3 to, int exp)
+    {
+        int scale = exp <= 0 ? 1 : (int)Math.pow(10, exp);
+        double dx = from.x - to.x;
+        double dy = from.y - to.y;
+        double dz = from.z - to.z;
+
+        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        int result = (int)Math.round(dist * scale);
+
+        Messenger.send(source, findDistanceBetweenTwoPoints(from, to));
+        return result;
+    }
+
     public static int setStart(CommandSourceStack source, Vec3 pos)
     {
         START_POINT_STORAGE.put(source.getTextName(), pos);

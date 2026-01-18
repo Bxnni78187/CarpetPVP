@@ -3,6 +3,7 @@ package carpet.commands;
 import carpet.helpers.EntityPlayerActionPack;
 import carpet.helpers.EntityPlayerActionPack.Action;
 import carpet.helpers.EntityPlayerActionPack.ActionType;
+import carpet.helpers.ItemCooldown;
 import carpet.CarpetSettings;
 import carpet.fakes.ServerPlayerInterface;
 import carpet.patches.EntityPlayerMPFake;
@@ -20,9 +21,12 @@ import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.DimensionArgument;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.GameModeArgument;
 import net.minecraft.commands.arguments.coordinates.RotationArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
+import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
@@ -30,9 +34,12 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import java.util.Collection;
@@ -69,6 +76,16 @@ public class PlayerCommand
                         .then(literal("kill").executes(PlayerCommand::kill))
                         .then(literal("disconnect").executes(PlayerCommand::disconnect))
                         .then(literal("shadow"). executes(PlayerCommand::shadow))
+                        .then(literal("itemCd")
+                                .executes(ItemCooldown::itemCdClearAll)
+                                .then(argument("item", ItemArgument.item(commandBuildContext))
+                                        .executes(ItemCooldown::itemCdAsk)
+                                        .then(literal("reset")
+                                                .executes(ItemCooldown::itemCdReset))
+                                        .then(literal("set")
+                                                .executes(ItemCooldown::itemCdSetDefault)
+                                                .then(argument("ticks", IntegerArgumentType.integer(0))
+                                                        .executes(ItemCooldown::itemCdSetCustom)))))
                         .then(literal("mount").executes(manipulation(ap -> ap.mount(true)))
                                 .then(literal("anything").executes(manipulation(ap -> ap.mount(false)))))
                         .then(literal("dismount").executes(manipulation(EntityPlayerActionPack::dismount)))
@@ -83,34 +100,21 @@ public class PlayerCommand
                                 .then(literal("west").executes(manipulation(ap -> ap.look(Direction.WEST))))
                                 .then(literal("up").executes(manipulation(ap -> ap.look(Direction.UP))))
                                 .then(literal("down").executes(manipulation(ap -> ap.look(Direction.DOWN))))
+                                .then(literal("upon")
+                                        .then(argument("entity", EntityArgument.entity())
+                                                .executes(c -> lookUpon(c, LookMode.EYES))
+                                                .then(literal("eyes")
+                                                        .executes(c -> lookUpon(c, LookMode.EYES)))
+                                                .then(literal("feet")
+                                                        .executes(c -> lookUpon(c, LookMode.FEET)))
+                                                .then(literal("closest")
+                                                        .executes(c -> lookUpon(c, LookMode.CLOSEST)))
+                                        )
+                                )
                                 .then(literal("at").then(argument("position", Vec3Argument.vec3())
                                         .executes(c -> manipulate(c, ap -> ap.lookAt(Vec3Argument.getVec3(c, "position"))))))
                                 .then(argument("direction", RotationArgument.rotation())
                                         .executes(c -> manipulate(c, ap -> ap.look(RotationArgument.getRotation(c, "direction").getRotation(c.getSource())))))
-                        ).then(literal("turn")
-                                .then(literal("left").executes(manipulation(ap -> ap.turn(-90, 0))))
-                                .then(literal("right").executes(manipulation(ap -> ap.turn(90, 0))))
-                                .then(literal("back").executes(manipulation(ap -> ap.turn(180, 0))))
-                                .then(argument("rotation", RotationArgument.rotation())
-                                        .executes(c -> manipulate(c, ap -> ap.turn(RotationArgument.getRotation(c, "rotation").getRotation(c.getSource())))))
-                        ).then(literal("move").executes(manipulation(EntityPlayerActionPack::stopMovement))
-                                .then(literal("forward").executes(manipulation(ap -> ap.setForward(1))))
-                                .then(literal("backward").executes(manipulation(ap -> ap.setForward(-1))))
-                                .then(literal("left").executes(manipulation(ap -> ap.setStrafing(1))))
-                                .then(literal("right").executes(manipulation(ap -> ap.setStrafing(-1))))
-                        ).then(literal("spawn").executes(PlayerCommand::spawn)
-                                .then(literal("in").requires((player) -> player.hasPermission(2))
-                                        .then(argument("gamemode", GameModeArgument.gameMode())
-                                        .executes(PlayerCommand::spawn)))
-                                .then(literal("at").then(argument("position", Vec3Argument.vec3()).executes(PlayerCommand::spawn)
-                                        .then(literal("facing").then(argument("direction", RotationArgument.rotation()).executes(PlayerCommand::spawn)
-                                                .then(literal("in").then(argument("dimension", DimensionArgument.dimension()).executes(PlayerCommand::spawn)
-                                                        .then(literal("in").requires((player) -> player.hasPermission(2))
-                                                                .then(argument("gamemode", GameModeArgument.gameMode())
-                                                                .executes(PlayerCommand::spawn)
-                                                        )))
-                                        )))
-                                ))
                         )
                 );
         dispatcher.register(command);
@@ -361,5 +365,48 @@ public class PlayerCommand
 
         EntityPlayerMPFake.createShadow(player.server, player);
         return 1;
+    }
+
+    //look upon stuff
+
+    private enum LookMode {
+        EYES,
+        FEET,
+        CLOSEST
+    }
+
+    private static int lookUpon(CommandContext<CommandSourceStack> context, LookMode mode)
+            throws CommandSyntaxException {
+
+        Entity target = EntityArgument.getEntity(context, "entity");
+        ServerPlayer player = getPlayer(context);
+
+        if (cantManipulate(context)) return 0;
+
+        Vec3 eyePos = player.getEyePosition();
+        Vec3 lookTarget = switch (mode) {
+            case FEET -> target.position();
+            case EYES -> target.getEyePosition();
+            case CLOSEST -> closestPointToBox(
+                    eyePos,
+                    target.getBoundingBox()
+            );
+        };
+
+        if (player instanceof ServerPlayerInterface fake) {
+            fake.getActionPack().lookAt(lookTarget);
+        } else {
+            player.lookAt(EntityAnchorArgument.Anchor.EYES, lookTarget);
+        }
+
+        return 1;
+    }
+
+    private static Vec3 closestPointToBox(Vec3 eye, AABB box) {
+        return new Vec3(
+                Mth.clamp(eye.x, box.minX, box.maxX),
+                Mth.clamp(eye.y, box.minY, box.maxY),
+                Mth.clamp(eye.z, box.minZ, box.maxZ)
+        );
     }
 }
